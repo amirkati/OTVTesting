@@ -5,6 +5,9 @@
 // Step 4: Testing and making adjustments as needed 
 // Note: It’s a lot easier to write code when we have something to test it on, we could make a complete “skeleton” code but we won’t know if it works until we can try it on the OTV (or some part of it) 
 
+// Choose one: testboard or otv
+#define HARDWARE_TESTBOARD
+//#define HARDWARE_OTV
 
 // For controlling DC motors with PWM Arduino with L298N H-Bridge  
 // #define is more compatible with newer Arduino IDE.
@@ -241,9 +244,19 @@ traverse_to_y(3700);
 
 }
 
+
+#ifdef HARDWARE_OTV
 // For connecting to the ESP8266 WiFi communication module, a placeholder for when the actual hardware is there to program. 
 
 #include <ESP8266WiFi.h>
+
+#endif
+
+#ifdef HARDWARE_TESTBOARD
+
+#include <WiFiS3.h>
+
+#endif
 
 void setup()
 {
