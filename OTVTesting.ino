@@ -169,15 +169,14 @@ return(0);
 // Will also depend on motor wiring, we may need to swap EAST and WEST 
 void rotate_absolute(double angle)
 {
-double tolerance=5; // Tolerance in degrees 
-// If it keeps spinning then the rotate needs a sign change because the motors were swapped
-// If it instead keeps moving back and forth, increase tolerance instead
-// Assuming angle 0 is NORTH towards increasing y 
-while(fabs(angle-aruco_angle())>tolerance)
-{
-  
-  rotate_relative(angle-aruco_angle());
-}
+  double tolerance=5; // Tolerance in degrees 
+  // If it keeps spinning then the rotate needs a sign change because the motors were swapped
+  // If it instead keeps moving back and forth, increase tolerance instead
+  // Assuming angle 0 is NORTH towards increasing y 
+  while(fabs(angle-aruco_angle())>tolerance)
+  {
+    rotate_relative(angle-aruco_angle());
+  }
 }
 
 int flame_detected()
@@ -276,7 +275,8 @@ traverse_to_y(3700);
 
 void setup()
 {
-  Serial.begin(115200);
+  Serial.begin(115200); // Arduino has a built-in Serial port, allows you to see TODO messages on the SerialMonitor (for convenience) 
+  // 115200 is the transmission speed, adjust SerialMonitor's speed to the same value
   Serial.println();
 
   #if 0 
@@ -295,6 +295,8 @@ void setup()
   #endif 
   
   // Enes100.begin(const char* teamName, byte teamType, int markerId, int roomNumber, int wifiModuleTX, int wifiModuleRX);
+  // TX and RX are lines on the ESP8266 used for communicating, TX is to transmit and RX is to receive
+  // Mega has only certain pins for communicating over WiFi (stated on the Enes100 library), needs to be tested 
   #ifdef HARDWARE_OTV 
   Enes100.begin("Fabulous Firefighters", FIRE, 25, 1116, 10, 11);
   #endif 
@@ -311,6 +313,7 @@ void setup()
   #endif 
 }
 
+// In meters
 #define ZONE_OBSTACLE_START 0.8
 #define ZONE_OPEN_START     2.8
 #define ZONE_GOAL_START     3.4
@@ -327,6 +330,7 @@ void setup()
 
 int state=STATE_START; 
 
+// IF this compiles well with Mega and ESP8266 WiFi module, this code will tell the OTV to drive to the other end of the field (as wanted in the MS5 document)
 void loop() 
 {
   if(state==STATE_START) 
