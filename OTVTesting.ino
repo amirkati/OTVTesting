@@ -5,7 +5,7 @@
 // Step 4: Testing and making adjustments as needed 
 // Note: It’s a lot easier to write code when we have something to test it on, we could make a complete “skeleton” code but we won’t know if it works until we can try it on the OTV (or some part of it) 
 
-#include "Enes100.h" // Includes the ENES100 library 
+#include "Enes100.h" // Includes the ENES100 library (which includes the VisionsystemClient.cpp)
 
 // Choose one: testboard or otv
 // #define HARDWARE_TESTBOARD
@@ -120,16 +120,6 @@ set_dc_motor(DCM_MOTOR2, DCM_DIR_OFF);
 TODO("set DCM_ANGLE_TO_TIME_FACTOR to value measured on real robot")
 }
 
-// This function will tell the motors to rotate with respect to absolute direction
-// Choose one direction, like NORTH for example. NORTH is 0 degrees, and rotate_absolute(45) would be 45 EAST of NORTH and rotate_absolute(-45) would be 45 WEST of NORTH.
-// Hardware will determine absolute angle and we'll pick direction from that. (If AruCo does that then AruCo will tell us.)  
-// Will also depend on motor wiring, we may need to swap EAST and WEST 
-void rotate_absolute(double angle)
-{
-int tolerance=0.5;
-TODO("find current angle from IMU or aruco and loop to set angle correctly")
-rotate_relative(angle-current_angle);
-}
 
 void extend_arm(int extend)
 {
@@ -164,12 +154,30 @@ return(Enes100.getY());
 return(0);
 }
 
+// Assuming angle 0 is NORTH towards increasing y 
 double aruco_angle()
 {
 #ifdef HARDWARE_OTV
 return(Enes100.getTheta()*180/3.1415);
 #endif
 return(0);
+}
+
+// This function will tell the motors to rotate with respect to absolute direction
+// Choose one direction, like NORTH for example. NORTH is 0 degrees, and rotate_absolute(45) would be 45 EAST of NORTH and rotate_absolute(-45) would be 45 WEST of NORTH.
+// Hardware will determine absolute angle and we'll pick direction from that. (If AruCo does that then AruCo will tell us.)  
+// Will also depend on motor wiring, we may need to swap EAST and WEST 
+void rotate_absolute(double angle)
+{
+double tolerance=5; // Tolerance in degrees 
+// If it keeps spinning then the rotate needs a sign change because the motors were swapped
+// If it instead keeps moving back and forth, increase tolerance instead
+// Assuming angle 0 is NORTH towards increasing y 
+while(fabs(angle-aruco_angle())>tolerance)
+{
+  
+  rotate_relative(angle-aruco_angle());
+}
 }
 
 int flame_detected()
@@ -323,7 +331,10 @@ void loop()
 {
   if(state==STATE_START) 
   {
-    move(0.1); // An example 
+    rotate_absolute(0); 
+    move(0.05); // An example 
+    rotate_absolute(90); // It points towards the candles 
+    TODO("add candle seeking after IR array is sorted out")
     state=STATE_FOUND_CANDLES; 
     Enes100.mission(NUM_CANDLES, 5); // Found 5 candles 
     Enes100.mission(TOPOGRAPHY, TOP_A); // or TOP_B or TOP_C
@@ -331,17 +342,20 @@ void loop()
   
   if(state==STATE_FOUND_CANDLES) 
   {
-    move(0.5); // An example
+    // Add any code necessary to start obstacle avoidance 
+    // For example, moving OTV to the middle of the field
+    // move(0.5);
     state=STATE_DRIVING_OBSTACLES; 
   }
 
   if(state==STATE_DRIVING_OBSTACLES) 
   {
-    move(1.0); // An example
+    rotate_absolute(0);
+    TODO("Add obstacle avoidance code when ultrasonic sensors are sorted out (pin locations and distance response)")  
+    move(0.1); // An example
     if(aruco_y()>ZONE_GOAL_START) 
     {
       state=STATE_REACHED_GOAL; 
-    
     }
   }
 
