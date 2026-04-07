@@ -303,10 +303,17 @@ void setup()
   #endif 
 }
 
+#define ZONE_OBSTACLE_START 0.8
+#define ZONE_OPEN_START     2.8
+#define ZONE_GOAL_START     3.4
+
+// A flowchart turns into a state machine if you assign a different number to each box.
+// Then the arrows tell you how and when you go from one state to another.
+
 #define STATE_START 0
 #define STATE_FOUND_CANDLES 1
-#define STATE_DRIVING_B 2 
-#define STATE_REACHED_C 3
+#define STATE_DRIVING_OBSTACLES 2 
+#define STATE_REACHED_GOAL 3
  
 #define STATE_DONE 255 
 
@@ -316,31 +323,29 @@ void loop()
 {
   if(state==STATE_START) 
   {
-    Enes100.mission(TOPOGRAPHY, TOP_A); // We land in A
     move(0.1); // An example 
     state=STATE_FOUND_CANDLES; 
     Enes100.mission(NUM_CANDLES, 5); // Found 5 candles 
+    Enes100.mission(TOPOGRAPHY, TOP_A); // or TOP_B or TOP_C
   }
   
   if(state==STATE_FOUND_CANDLES) 
   {
     move(0.5); // An example
-    state=STATE_DRIVING_B; 
-    Enes100.mission(TOPOGRAPHY, TOP_B); 
+    state=STATE_DRIVING_OBSTACLES; 
   }
 
-  if(state==STATE_DRIVING_B) 
+  if(state==STATE_DRIVING_OBSTACLES) 
   {
     move(1.0); // An example
-    if(aruco_y()>4.0) 
+    if(aruco_y()>ZONE_GOAL_START) 
     {
-      state=STATE_REACHED_C; 
-      Enes100.mission(TOPOGRAPHY, TOP_C); 
+      state=STATE_REACHED_GOAL; 
     
     }
   }
 
-  if(state==STATE_REACHED_C) 
+  if(state==STATE_REACHED_GOAL) 
   {
     state=STATE_DONE;
     Enes100.println("All done!"); 
