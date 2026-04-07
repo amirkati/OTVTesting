@@ -5,9 +5,11 @@
 // Step 4: Testing and making adjustments as needed 
 // Note: It’s a lot easier to write code when we have something to test it on, we could make a complete “skeleton” code but we won’t know if it works until we can try it on the OTV (or some part of it) 
 
+#include "Enes100.h" // Includes the ENES100 library 
+
 // Choose one: testboard or otv
-#define HARDWARE_TESTBOARD
-//#define HARDWARE_OTV
+// #define HARDWARE_TESTBOARD
+#define HARDWARE_OTV
 
 // For controlling DC motors with PWM Arduino with L298N H-Bridge  
 // #define is more compatible with newer Arduino IDE.
@@ -148,19 +150,25 @@ return(0);
 
 double aruco_x()
 {
-TODO("aruco x coordinate")
+#ifdef HARDWARE_OTV
+return(Enes100.getX());
+#endif
 return(0);
 }
 
 double aruco_y()
 {
-TODO("aruco y coordinate")
+#ifdef HARDWARE_OTV
+return(Enes100.getY());
+#endif
 return(0);
 }
 
 double aruco_angle()
 {
-TODO("aruco angle")
+#ifdef HARDWARE_OTV
+return(Enes100.getTheta()*180/3.1415);
+#endif
 return(0);
 }
 
@@ -248,7 +256,7 @@ traverse_to_y(3700);
 #ifdef HARDWARE_OTV
 // For connecting to the ESP8266 WiFi communication module, a placeholder for when the actual hardware is there to program. 
 
-#include <ESP8266WiFi.h>
+// #include <ESP8266WiFi.h>
 
 #endif
 
@@ -263,6 +271,7 @@ void setup()
   Serial.begin(115200);
   Serial.println();
 
+  #if 0 
   WiFi.begin("network-name", "pass-to-network");
 
   Serial.print("Connecting");
@@ -275,6 +284,12 @@ void setup()
 
   Serial.print("Connected, IP address: ");
   Serial.println(WiFi.localIP());
+  #endif 
+  
+  // Enes100.begin(const char* teamName, byte teamType, int markerId, int roomNumber, int wifiModuleTX, int wifiModuleRX);
+  #ifdef HARDWARE_OTV 
+  Enes100.begin("Fabulous Firefighters", FIRE, 25, 1116, 10, 11);
+  #endif 
   
   pinMode (DCM_IN1, OUTPUT);
   pinMode (DCM_IN2, OUTPUT);
@@ -282,13 +297,52 @@ void setup()
   pinMode (DCM_IN4, OUTPUT);
   pinMode (DCM_ENA, OUTPUT);
   pinMode (DCM_ENB,   OUTPUT);
+
+  #ifdef HARDWARE_OTV
+  Enes100.println("Setup done"); 
+  #endif 
 }
 
+#define STATE_START 0
+#define STATE_FOUND_CANDLES 1
+#define STATE_DRIVING_B 2 
+#define STATE_REACHED_C 3
+ 
+#define STATE_DONE 255 
+
+int state=STATE_START; 
 
 void loop() 
 {
-move(0.3);
-delay(2000);
-move(-0.3);
-delay(2000);
+  if(state==STATE_START) 
+  {
+    Enes100.mission(TOPOGRAPHY, TOP_A); // We land in A
+    move(0.1); // An example 
+    state=STATE_FOUND_CANDLES; 
+    Enes100.mission(NUM_CANDLES, 5); // Found 5 candles 
+  }
+  
+  if(state==STATE_FOUND_CANDLES) 
+  {
+    move(0.5); // An example
+    state=STATE_DRIVING_B; 
+    Enes100.mission(TOPOGRAPHY, TOP_B); 
+  }
+
+  if(state==STATE_DRIVING_B) 
+  {
+    move(1.0); // An example
+    if(aruco_y()>4.0) 
+    {
+      state=STATE_REACHED_C; 
+      Enes100.mission(TOPOGRAPHY, TOP_C); 
+    
+    }
+  }
+
+  if(state==STATE_REACHED_C) 
+  {
+    state=STATE_DONE;
+    Enes100.println("All done!"); 
+  }
 }
