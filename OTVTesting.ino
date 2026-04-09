@@ -3,7 +3,7 @@
 // Step 2: Write each basic function (need more information about aruco and ESP8266 WiFi Communication Module for example to start writing) 
 // Step 3: Once all the necessary functions are finished, we can write the main body of code that will have the OTV perform each task (we’ll use each function when a task calls for it) 
 // Step 4: Testing and making adjustments as needed 
-// Note: It’s a lot easier to write code when we have something to test it on, we could make a complete “skeleton” code but we won’t know if it works until we can try it on the OTV (or some part of it) 
+// Note: It’s a lot easier to write code when we have something to test, we won’t know if it works until we try it on the OTV (or some part of it) 
 
 #include "Enes100.h" // Includes the ENES100 library (which includes the VisionSystemClient.cpp)
 
@@ -18,7 +18,7 @@
 // Naming it DCM_ prefix is a good way to prevent collisions with other code
 // These numbers are actual hardware connections
 // SWAP IN1 with IN2 (or IN3 with IN4) to reverse motor direction
-// SWAP pairs (IN1, IN2) with (IN3, IN4) to swap left and right motor
+// If the thermal camera angle keeps spinning then SWAP pairs (IN1, IN2) with (IN3, IN4) to swap left and right motor
 #define DCM_IN1 7
 #define DCM_IN2 6
 #define DCM_IN3 5
@@ -26,14 +26,23 @@
 #define DCM_ENA 9
 #define DCM_ENB 3
 
+/* This factor needs to be adjusted so that it gives number of seconds for motors to run to travel 1 meter */
+#define DCM_DISTANCE_TO_TIME_FACTOR       1.5
+/* This factor needs to be adjusted so that it gives number of minutes for motors to run in opposite to rotate 60 degrees (or number of seconds to rotate 1 degree, but that is hard to measure)
+   reduce value to prevent overshoot in rotate_absolute() 
+   */
+#define DCM_ANGLE_TO_TIME_FACTOR          0.5
+
 // For lab-provided ESP8266 for Aruco
 // Note for Mega only these values are recommended:
 // https://enes100.umd.edu/documentation/arduino/
 // Mega - 10, 11, 12, 13, 14, 15, 50, 51, 52, 53, A8 (62), A9 (63), A10 (64), A11 (65), A12 (66), A13 (67), A14 (68), A15 (69) 
 // Students have had difficulty with the Mega. Some students have a certain set of pins work while other students will find those same pins broken.
 
+// Change these based on where the ESP8266 is actually connected. Check that it is an allowed pin for Mega.
 #define ESP8266_TX        10
 #define ESP8266_RX        11
+// Ask TA and change ESP8266_MARKER
 #define ESP8266_MARKER    25
 #define ESP8266_ROOM      1116
 
@@ -103,8 +112,6 @@ if(motor==DCM_MOTOR1) {
 
 double current_x, current_y, current_angle;
 
-#define DCM_DISTANCE_TO_TIME_FACTOR       1.5
-#define DCM_ANGLE_TO_TIME_FACTOR          0.5
 
 // This function will set the motors to rotate forward or backward and then wait. 
 // Time to wait can be changed. 
@@ -293,7 +300,21 @@ if((x0>=0) && (y0>=0) && (x0<NX) && (y0<NY))topo_map[x0][y0]=mark;
 
 void traverse_to(double dest_x, double dest_y)
 {
-TODO("Use aruco x,y and angle as well as map to drive to dest_x and dest_y. Update map as obstacles are found")
+double dx, dy, angle;
+double tolerance=0.1;
+rotate_absolute(0);
+
+ TODO("Use aruco x,y and angle as well as map to drive to dest_x and dest_y. Update map as obstacles are found")
+
+while(1) {
+  dx=dest_x-aruco_x();
+  dy=dest_y-aruco_y();
+  if(fabs(dx)<tolerance && fabs(dy)<tolerance)break;
+  angle=atan2(dy, dx)*180/3.1415;
+  rotate_absolute(angle);
+  move(0.05);
+  }
+rotate_absolute(0);
 }
 
 void traverse_to_y(double dest_y)
@@ -333,12 +354,18 @@ traverse_to_y(3700);
 
 #endif
 
+// In meters
+#define ZONE_OBSTACLE_START 0.8
+#define ZONE_OPEN_START     2.8
+#define ZONE_GOAL_START     3.4
+
 void setup()
 {
   Serial.begin(115200); // Arduino has a built-in Serial port, allows you to see TODO messages on the SerialMonitor (for convenience) 
   // 115200 is the transmission speed, adjust SerialMonitor's speed to the same value
   Serial.println();
 
+  // An example of connecting to a WiFi network
   #if 0 
   WiFi.begin("network-name", "pass-to-network");
 
@@ -370,11 +397,27 @@ void setup()
 
 /* Change 0 to 1 to make motors constantly spin forward for FORWARD LOCOMOTION */
 /* 0 comments out the code essentially */ 
-#if 0
+#if 1
   set_dc_motor(DCM_MOTOR1, DCM_DIR_FORWARD);
   set_dc_motor(DCM_MOTOR2, DCM_DIR_FORWARD);
   while(1); /* endless loop */
 #endif
+
+
+#if 0
+  /* 90 degree turns using rotate_relative(), without Aruco */
+   // Rotate left first
+  rotate_relative(90);
+  delay(5000);
+  // Rotate right
+  rotate_relative(-90);
+  delay(5000);
+  // Rotate left again
+  rotate_relative(90);
+  while(1);
+
+#endif
+
 
   // Enes100.begin(const char* teamName, byte teamType, int markerId, int roomNumber, int wifiModuleTX, int wifiModuleRX);
   // TX and RX are lines on the ESP8266 used for communicating, TX is to transmit and RX is to receive
@@ -383,12 +426,32 @@ void setup()
   Enes100.begin("Fabulous Firefighters", FIRE, ESP8266_MARKER, ESP8266_ROOM, ESP8266_TX, ESP8266_RX);
   Enes100.println("Setup done"); 
   #endif 
+
+#if 0
+/* 90 degree rotation test */
+  rotate_absolute(0);
+  delay(5000);
+  rotate_absolute(90);
+  delay(5000);
+  rotate_absolute(180);
+  delay(5000);
+  rotate_absolute(270);
+  delay(5000);
+  rotate_absolute(0);
+  while(1); /* endless loop */
+  
+#endif
+
+
+#if 0
+  /* Random mission test */
+ if(aruco_x()<1.0)traverse_to(1.5, 0.4);
+     else traverse_to(0.5, 0.4);
+  while(1); /* endless loop */
+
+#endif
 }
 
-// In meters
-#define ZONE_OBSTACLE_START 0.8
-#define ZONE_OPEN_START     2.8
-#define ZONE_GOAL_START     3.4
 
 // A flowchart turns into a state machine if you assign a different number to each box.
 // Then the arrows tell you how and when you go from one state to another.
