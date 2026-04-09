@@ -6,6 +6,7 @@
 // Note: It’s a lot easier to write code when we have something to test, we won’t know if it works until we try it on the OTV (or some part of it) 
 
 #include "Enes100.h" // Includes the ENES100 library (which includes the VisionSystemClient.cpp)
+#include <SCServo.h>
 
 // Choose one: testboard or otv
 // #define HARDWARE_TESTBOARD
@@ -57,6 +58,28 @@
 #define ULTRA2_ECHO     51
 #define ULTRA3_TRIG     52
 #define ULTRA3_ECHO     53
+
+// Servo motor UART pins for Mega: Serial1 is (RX=19 TX=18) Serial2 is (RX=17, TX=16) and so on.
+// The SERVO_SERIAL HAS to match pins
+// Serial1 is the ojbect that controls UART1.
+// Serial2 constrols UART2
+// Serial3 constrols UART3
+// Serial controls UART0 and should not be used on Mega unless it cannot be helped.
+
+
+#define SERVO_UART_TX      18
+#define SERVO_UART_RX      19
+#define SERVO_SERIAL        Serial1
+
+// servo number is marked on servo
+#define BLANKET_SERVO       4
+
+// angle that makes blanket go down - adjust based on test
+#define BLANKET_DOWN_POSITION  2048
+
+// angle that makes blanket go up - adjust based on test
+#define BLANKET_UP_POSITION   0
+
 
 // *************** END PIN ASSIGNMENTS ***********************
 
@@ -244,6 +267,20 @@ void rotate_absolute(double angle)
   }
 }
 
+// code for deploying blanket
+
+SMS_STS st;
+
+void blanket_down(void)
+{
+st.WritePosEx(BLANKET_SERVO, BLANKET_DOWN_POSITION, 3400, 50);
+}
+
+void blanket_up(void)
+{
+st.WritePosEx(BLANKET_SERVO, BLANKET_UP_POSITION, 3400, 50);
+}
+
 // To be coded later
 int flame_detected()
 {
@@ -421,6 +458,21 @@ void setup()
   rotate_relative(90);
   while(1);
 
+#endif
+
+// Change 0 to 1 to begin subtask 10 if servo pins are connected (and written correctly) 
+// This elevates the blanket up and waits for 5 seconds, and then puts blanket down and waits for 5 seconds. It repeats. 
+// SERIAL_8N1 is a parity setting that describes the format of transmitted data. (The parity bit is 8 total data bits, no parity bit and one stop bit.)
+#if 0
+SERVO_SERIAL.begin(1000000, SERIAL_8N1);
+st.pSerial=&SERVO_SERIAL;
+
+while(1) {
+    blanket_up();
+    delay(5000);
+    blanket_down();
+    delay(5000);
+}
 #endif
 
 
