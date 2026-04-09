@@ -149,7 +149,7 @@ if(angle<0)
   set_dc_motor(DCM_MOTOR1, DCM_DIR_BACKWARD);
   set_dc_motor(DCM_MOTOR2, DCM_DIR_FORWARD);
   }
-// DC motors do not provide any feedback, go by running time
+// DC motors do not provide any feedback, they go by running time
 delay(fabs(angle)*DCM_ANGLE_TO_TIME_FACTOR);
 set_dc_motor(DCM_MOTOR1, DCM_DIR_OFF);
 set_dc_motor(DCM_MOTOR2, DCM_DIR_OFF);
@@ -178,6 +178,7 @@ double duration=pulseIn(ultra_echo[sensor], HIGH);
 return(duration*0.034*0.5);
 }
 
+// To be coded later
 void extend_arm(int extend)
 {
 TODO("extend arm when extend is 1, retract when extend is 0")
@@ -330,7 +331,7 @@ current_angle=aruco_angle();
 
 traverse_to(current_x, 150);
 
-TODO("Find fire and face it")
+// TODO("Find fire and face it")
 
 extend_arm(1);
 delay(10000); /* 10sec */
@@ -395,7 +396,7 @@ void setup()
   pinMode (ULTRA3_TRIG, OUTPUT);
   pinMode (ULTRA3_ECHO , INPUT);
 
-/* Change 0 to 1 to make motors constantly spin forward for FORWARD LOCOMOTION */
+// Change 0 to 1 to make motors constantly spin forward for FORWARD LOCOMOTION to begin subtask 2
 /* 0 comments out the code essentially */ 
 #if 1
   set_dc_motor(DCM_MOTOR1, DCM_DIR_FORWARD);
@@ -403,7 +404,10 @@ void setup()
   while(1); /* endless loop */
 #endif
 
-
+// Change to 1 to begin subtask 3 when wifi is not working
+// Does a 90 degree turn and waits for 5 seconds. OTV performs this 3 times.
+// Depends on calibration factors to be correct. 
+// If Wifi works, then the code below this should work better
 #if 0
   /* 90 degree turns using rotate_relative(), without Aruco */
    // Rotate left first
@@ -425,8 +429,41 @@ void setup()
   #ifdef HARDWARE_OTV 
   Enes100.begin("Fabulous Firefighters", FIRE, ESP8266_MARKER, ESP8266_ROOM, ESP8266_TX, ESP8266_RX);
   Enes100.println("Setup done"); 
+  
+  Serial.print("Aruco data:");
+  Serial.print("x=");
+  Serial.print(aruco_x());
+  Serial.print("y=");
+  Serial.print(aruco_y());
+  Serial.print("theta=");
+  Serial.print(aruco_angle());
+  Serial.println();
+  
+  Enes100.print("Aruco data:");
+  Enes100.print("x=");
+  Enes100.print(aruco_x());
+  Enes100.print("y=");
+  Enes100.print(aruco_y());
+  Enes100.print("theta=");
+  Enes100.print(aruco_angle());
+  Enes100.println("");
+
+  // Change 0 to 1 to demonstrate subtask 5.
+  // Sends hardcoded messages every 5 seconds. 
+  #if 0
+
+      while(1) {
+      Enes100.mission(NUM_CANDLES, 5); // Found 5 candles 
+      Enes100.mission(TOPOGRAPHY, TOP_A); // or TOP_B or TOP_C
+      delay(5000);
+      }
+
+  #endif
+  
   #endif 
 
+// Change to 1 to begin subtask 3.
+// Does a 90 degree turn and waits for 5 seconds. OTV performs this 3 times.
 #if 0
 /* 90 degree rotation test */
   rotate_absolute(0);
@@ -442,11 +479,16 @@ void setup()
   
 #endif
 
-
+// Change to 1 to begin subtask 6. 
+// Determines if it is in landing spot A or B and then goes to the opposite spot. 
+// Waits 5 seconds and goes to specified spot (before log) and stops movement. 
 #if 0
   /* Random mission test */
  if(aruco_x()<1.0)traverse_to(1.5, 0.4);
      else traverse_to(0.5, 0.4);
+   delay(5000); /* wait 5 sec */
+   /* go to before log */
+   traverse_to(1.0, 2.1); 
   while(1); /* endless loop */
 
 #endif
