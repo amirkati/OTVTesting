@@ -175,7 +175,7 @@ digitalWrite(ultra_trig[sensor], HIGH);
 delayMicroseconds(10);
 digitalWrite(ultra_trig[sensor], LOW);
 double duration=pulseIn(ultra_echo[sensor], HIGH);
-return(duration*0.034*0.5);
+return(duration*0.000343*0.5);
 }
 
 // To be coded later
@@ -244,6 +244,7 @@ void rotate_absolute(double angle)
   }
 }
 
+// To be coded later
 int flame_detected()
 {
 TODO("This tells if it sees the flame")
