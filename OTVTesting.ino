@@ -5,22 +5,51 @@
 // Step 4: Testing and making adjustments as needed 
 // Note: It’s a lot easier to write code when we have something to test it on, we could make a complete “skeleton” code but we won’t know if it works until we can try it on the OTV (or some part of it) 
 
-#include "Enes100.h" // Includes the ENES100 library (which includes the VisionsystemClient.cpp)
+#include "Enes100.h" // Includes the ENES100 library (which includes the VisionSystemClient.cpp)
 
 // Choose one: testboard or otv
 // #define HARDWARE_TESTBOARD
 #define HARDWARE_OTV
 
+//  ****** PIN ASSIGNMENTS *******
+
 // For controlling DC motors with PWM Arduino with L298N H-Bridge  
 // #define is more compatible with newer Arduino IDE.
 // Naming it DCM_ prefix is a good way to prevent collisions with other code
 // These numbers are actual hardware connections
+// SWAP IN1 with IN2 (or IN3 with IN4) to reverse motor direction
+// SWAP pairs (IN1, IN2) with (IN3, IN4) to swap left and right motor
 #define DCM_IN1 7
 #define DCM_IN2 6
 #define DCM_IN3 5
 #define DCM_IN4 4
 #define DCM_ENA 9
 #define DCM_ENB 3
+
+// For lab-provided ESP8266 for Aruco
+// Note for Mega only these values are recommended:
+// https://enes100.umd.edu/documentation/arduino/
+// Mega - 10, 11, 12, 13, 14, 15, 50, 51, 52, 53, A8 (62), A9 (63), A10 (64), A11 (65), A12 (66), A13 (67), A14 (68), A15 (69) 
+// Students have had difficulty with the Mega. Some students have a certain set of pins work while other students will find those same pins broken.
+
+#define ESP8266_TX        10
+#define ESP8266_RX        11
+#define ESP8266_MARKER    25
+#define ESP8266_ROOM      1116
+
+// change this if ARUCO 0 angle does not align with Y direction that points from landing zone to finish.
+#define ARUCO_Y_ANGLE     0
+
+// Ultrasonic sensors:
+
+#define ULTRA1_TRIG     32
+#define ULTRA1_ECHO     33
+#define ULTRA2_TRIG     50
+#define ULTRA2_ECHO     51
+#define ULTRA3_TRIG     52
+#define ULTRA3_ECHO     53
+
+// *************** END PIN ASSIGNMENTS ***********************
 
 // These numbers are symbolic constants (can be changed if preferred) that are passed to set_dc_motor() 
 #define DCM_MOTOR1  1
@@ -120,6 +149,27 @@ set_dc_motor(DCM_MOTOR2, DCM_DIR_OFF);
 TODO("set DCM_ANGLE_TO_TIME_FACTOR to value measured on real robot")
 }
 
+int ultra_trig[3]={ULTRA1_TRIG, ULTRA2_TRIG, ULTRA3_TRIG};
+int ultra_echo[3]={ULTRA1_ECHO, ULTRA2_ECHO, ULTRA3_ECHO};
+
+#define ULTRA_SENSOR1     0
+#define ULTRA_SENSOR2     1
+#define ULTRA_SENSOR3     2
+
+// Returns distance in meters
+double read_ultrasonic_sensor(int sensor)
+{
+if(sensor<0)return(-1);
+if(sensor>2)return(-1);
+
+digitalWrite(ultra_trig[sensor], LOW);
+delayMicroseconds(2);
+digitalWrite(ultra_trig[sensor], HIGH);
+delayMicroseconds(10);
+digitalWrite(ultra_trig[sensor], LOW);
+double duration=pulseIn(ultra_echo[sensor], HIGH);
+return(duration*0.034*0.5);
+}
 
 void extend_arm(int extend)
 {
@@ -158,7 +208,10 @@ return(0);
 double aruco_angle()
 {
 #ifdef HARDWARE_OTV
-return(Enes100.getTheta()*180/3.1415);
+double a=Enes100.getTheta()*180/3.1415-ARUCO_Y_ANGLE;
+if(a> 180)a-=360.0;
+if(a< -180)a+=360.0;
+return(a);
 #endif
 return(0);
 }
@@ -173,9 +226,13 @@ void rotate_absolute(double angle)
   // If it keeps spinning then the rotate needs a sign change because the motors were swapped
   // If it instead keeps moving back and forth, increase tolerance instead
   // Assuming angle 0 is NORTH towards increasing y 
-  while(fabs(angle-aruco_angle())>tolerance)
+  while(1)
   {
-    rotate_relative(angle-aruco_angle());
+    float angle_error=angle-aruco_angle();
+    if(angle_error< -180)angle_error+=360.0;
+    if(angle_error>   180)angle_error-=360.0;
+    if(fabs(angle_error)<tolerance)break;
+    rotate_relative(angle_error);
   }
 }
 
@@ -205,6 +262,7 @@ if(!flame_detected())return(-1e20);
 return(forward_obstacle_distance());
 }
 
+// Change 50 to 100 or 150 if issues arise (higher number means less resolution and therefore less memory used)
 #define SQUARE_WIDTH_MM  50
 #define NX (5000/SQUARE_WIDTH_MM)
 #define NY (5000/SQUARE_WIDTH_MM)
@@ -214,7 +272,8 @@ return(forward_obstacle_distance());
 #define MARK_FIRE 2
 
 int topo_map[NX][NY];
-// topo_map - an array of squares that holds marks of where the fire is and where obstacles are.
+// topo_map - an array of squares (a grid) that holds marks of where the fire is and where obstacles are.
+// topo_map[NX][NY]=(CONSTANT NAME);
 
 // This function will initialize the map. 
 void init_map(void)
@@ -223,6 +282,7 @@ for(int i=0;i<NX;i++)
  for(int j=0;j<NY;j++) topo_map[i][j]=0;
 }
 
+// mark_map(20, 15, MARK_FIRE); An example
 void mark_map(double x, double y, int mark)
 {
 int x0=round(x/SQUARE_WIDTH_MM);
@@ -294,12 +354,6 @@ void setup()
   Serial.println(WiFi.localIP());
   #endif 
   
-  // Enes100.begin(const char* teamName, byte teamType, int markerId, int roomNumber, int wifiModuleTX, int wifiModuleRX);
-  // TX and RX are lines on the ESP8266 used for communicating, TX is to transmit and RX is to receive
-  // Mega has only certain pins for communicating over WiFi (stated on the Enes100 library), needs to be tested 
-  #ifdef HARDWARE_OTV 
-  Enes100.begin("Fabulous Firefighters", FIRE, 25, 1116, 10, 11);
-  #endif 
   
   pinMode (DCM_IN1, OUTPUT);
   pinMode (DCM_IN2, OUTPUT);
@@ -307,8 +361,26 @@ void setup()
   pinMode (DCM_IN4, OUTPUT);
   pinMode (DCM_ENA, OUTPUT);
   pinMode (DCM_ENB,   OUTPUT);
+  pinMode (ULTRA1_TRIG, OUTPUT);
+  pinMode (ULTRA1_ECHO , INPUT);
+  pinMode (ULTRA2_TRIG, OUTPUT);
+  pinMode (ULTRA2_ECHO , INPUT);
+  pinMode (ULTRA3_TRIG, OUTPUT);
+  pinMode (ULTRA3_ECHO , INPUT);
 
-  #ifdef HARDWARE_OTV
+/* Change 0 to 1 to make motors constantly spin forward for FORWARD LOCOMOTION */
+/* 0 comments out the code essentially */ 
+#if 0
+  set_dc_motor(DCM_MOTOR1, DCM_DIR_FORWARD);
+  set_dc_motor(DCM_MOTOR2, DCM_DIR_FORWARD);
+  while(1); /* endless loop */
+#endif
+
+  // Enes100.begin(const char* teamName, byte teamType, int markerId, int roomNumber, int wifiModuleTX, int wifiModuleRX);
+  // TX and RX are lines on the ESP8266 used for communicating, TX is to transmit and RX is to receive
+  // Mega has only certain pins for communicating over WiFi (stated on the Enes100 library), needs to be tested 
+  #ifdef HARDWARE_OTV 
+  Enes100.begin("Fabulous Firefighters", FIRE, ESP8266_MARKER, ESP8266_ROOM, ESP8266_TX, ESP8266_RX);
   Enes100.println("Setup done"); 
   #endif 
 }
