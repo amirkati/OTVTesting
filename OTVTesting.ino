@@ -412,6 +412,12 @@ void main_program(void)
 #define ZONE_OPEN_START     2.8
 #define ZONE_GOAL_START     3.4
 
+// long is an integer variable that can hold large numbers that are 32 bits
+// unsigned is a variable that only stores non-negative numbers
+unsigned long AMG_frame_timestamp;
+// It is in milliseconds 
+#define AMG_frame_interval 111000
+
 void setup()
 {
   Serial.begin(115200); // Arduino has a built-in Serial port, allows you to see TODO messages on the SerialMonitor (for convenience) 
@@ -450,7 +456,7 @@ void setup()
 
   // AMG8833 IR Array code
 
-  Serial.begin(9600);
+  AMG_frame_timestamp=millis();
   Serial.println(F("AMG8833 pixels"));
 
   bool status;
@@ -602,7 +608,11 @@ void loop()
   {
     // For the AMG8833 camera 
     //read all the pixels
-    amg.readPixels(pixels);
+    if(AMG_frame_timestamp+AMG_frame_interval<millis())
+    {
+      amg.readPixels(pixels);
+      AMG_frame_timestamp=millis();
+    }
 
     Serial.print("[");
     for(int i=1; i<=AMG88xx_PIXEL_ARRAY_SIZE; i++){
@@ -612,9 +622,6 @@ void loop()
       }
     Serial.println("]");
     Serial.println();
-
-    //delay a second
-    delay(1000);
     
     rotate_absolute(0); 
     move(0.05); // An example 
