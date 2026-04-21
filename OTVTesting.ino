@@ -16,11 +16,20 @@ Adafruit_AMG88xx amg;
 
 float pixels[AMG88xx_PIXEL_ARRAY_SIZE];
 
-// Choose one: testboard or otv
+// Choose one: testboard or otv or ENES_LAB_TANK
 // #define HARDWARE_TESTBOARD
-#define HARDWARE_OTV
+// #define HARDWARE_OTV
+#define HARDWARE_ENES_LAB_TANK
 
-//  ****** PIN ASSIGNMENTS *******
+/* Defines for specific hardware modules */
+
+#define HARDWARE_ARUCO_PRESENT
+
+// Uncomment for OTV
+// #define HARDWARE_AMG8833_PRESENT
+
+#ifdef HARDWARE_OTV
+//  ****** START OTV PIN ASSIGNMENTS *******
 
 // For controlling DC motors with PWM Arduino with L298N H-Bridge  
 // #define is more compatible with newer Arduino IDE.
@@ -89,7 +98,77 @@ float pixels[AMG88xx_PIXEL_ARRAY_SIZE];
 #define BLANKET_UP_POSITION   0
 
 
-// *************** END PIN ASSIGNMENTS ***********************
+// *************** END OTV PIN ASSIGNMENTS ***********************
+
+#endif
+
+#ifdef HARDWARE_ENES_LAB_TANK
+//  ****** START OTV PIN ASSIGNMENTS *******
+
+// Motors
+#define PIN_MOTOR_1_FORWARD 11
+#define PIN_MOTOR_1_REVERSE 10
+#define PIN_MOTOR_2_FORWARD 9
+#define PIN_MOTOR_2_REVERSE 8
+#define PIN_MOTOR_3_FORWARD 4
+#define PIN_MOTOR_3_REVERSE 5
+#define PIN_MOTOR_4_FORWARD 2
+#define PIN_MOTOR_4_REVERSE 3
+// Bump Sensors
+#define PIN_BUMP_FRONT 32
+#define PIN_BUMP_REAR 33
+// Ultrasonic Sensors
+#define PIN_US_FRONT_TRIG 18
+#define PIN_US_FRONT_ECHO 19
+#define PIN_US_REAR_TRIG 27
+#define PIN_US_REAR_ECHO 26
+// Infrared Sensors
+#define PIN_IR_1 15
+#define PIN_IR_2 17
+#define PIN_IR_3 14
+#define PIN_IR_4 16
+// WiFi Modules
+#define PIN_WIFI_TX 52
+#define PIN_WIFI_RX 50
+
+#define ULTRA1_TRIG     PIN_US_FRONT_TRIG
+#define ULTRA1_ECHO     PIN_US_FRONT_ECHO
+#define ULTRA2_TRIG     PIN_US_REAR_TRIG
+#define ULTRA2_ECHO     PIN_US_REAR_ECHO
+/* ENES_LAB_TANK has only 2 sensors, wire 3rd to 2nd */
+#define ULTRA3_TRIG     PIN_US_REAR_TRIG
+#define ULTRA3_ECHO     PIN_US_REAR_ECHO
+
+/* This factor needs to be adjusted so that it gives number of seconds for motors to run to travel 1 meter */
+#define DCM_DISTANCE_TO_TIME_FACTOR       1.5
+/* This factor needs to be adjusted so that it gives number of minutes for motors to run in opposite to rotate 60 degrees (or number of seconds to rotate 1 degree, but that is hard to measure)
+   reduce value to prevent overshoot in rotate_absolute() 
+   */
+#define DCM_ANGLE_TO_TIME_FACTOR          0.5
+
+// Tank pin assignments
+#define ESP8266_TX        PIN_WIFI_TX
+#define ESP8266_RX        PIN_WIFI_RX
+// Ask TA and change ESP8266_MARKER
+#define ESP8266_MARKER    397
+#define ESP8266_ROOM      1116
+
+/* ENES_LAB_TANK has no servos, define for compatibility */
+#define SERVO_UART_TX      18
+#define SERVO_UART_RX      19
+#define SERVO_SERIAL        Serial1
+
+// servo number is marked on servo
+#define BLANKET_SERVO       4
+
+// angle that makes blanket go down - adjust based on test
+#define BLANKET_DOWN_POSITION  2048
+
+// angle that makes blanket go up - adjust based on test
+#define BLANKET_UP_POSITION   0
+
+// *************** END ENES_LAB_TANK PIN ASSIGNMENTS ***********************
+#endif
 
 // These numbers are symbolic constants (can be changed if preferred) that are passed to set_dc_motor() 
 #define DCM_MOTOR1  1
@@ -104,6 +183,8 @@ float pixels[AMG88xx_PIXEL_ARRAY_SIZE];
 // TODO is a #define - every time the compiler sees it, it substitutes the string to the right of TODO. It’s a convenient way to leave messages (from my point of view). 
 #define TODO(msg) fprintf(stderr, "*** TODO %s %s:%d\n", msg, __FILE__, __LINE__);
 
+
+#ifdef HARDWARE_OTV
 // This function will make each motor move forward, backward, or off.  
 // 6 registers that control 2 motors, 2 ens and 4 INs. Each motor is controlled by 1 en and 2 IN. 
 // en is a variable that will set the motor on or off 
@@ -144,6 +225,71 @@ void set_dc_motor(int motor, int dir, int speed)
     digitalWrite(DCM_IN4, in2);
     }
 }
+
+#endif
+
+#ifdef HARDWARE_ENES_LAB_TANK
+void TankClient_setMotorPWM(int motorId, int pwm){
+    // Inputs: motorId, an int [1, 4] to select the target motor
+    //         pwm, the pwm of the motor, can be + or - to indicate direction
+
+    // Verify and correct bounds on pwm value
+    if (pwm > 255) {pwm = 255;} 
+    else if (pwm < -255) {pwm = -255;}
+
+    // Verify motorId
+    if (motorId < 1 || motorId > 4) {return;}
+
+    int forward_pin;
+    int reverse_pin;
+    
+    // Get pins to use
+    if (motorId == 1) {
+        forward_pin = PIN_MOTOR_1_FORWARD;
+        reverse_pin = PIN_MOTOR_1_REVERSE;
+    }
+    else if (motorId == 2) {
+        forward_pin = PIN_MOTOR_2_FORWARD;
+        reverse_pin = PIN_MOTOR_2_REVERSE;
+    }
+    else if (motorId == 3) {
+        forward_pin = PIN_MOTOR_3_FORWARD;
+        reverse_pin = PIN_MOTOR_3_REVERSE;
+    }
+    else {
+        forward_pin = PIN_MOTOR_4_FORWARD;
+        reverse_pin = PIN_MOTOR_4_REVERSE;
+    }
+
+    // Set pin PWM and GND
+    if (pwm >= 0) {
+        analogWrite(forward_pin, abs(pwm));
+        digitalWrite(reverse_pin, 0);
+    }
+    else {
+        digitalWrite(forward_pin, 0);
+        analogWrite(reverse_pin, abs(pwm));
+    } 
+};
+
+void set_dc_motor(int motor, int dir, int speed)
+{
+  if(dir==DCM_DIR_OFF)speed=0;
+  else
+  if(dir=DCM_DIR_BACKWARD)speed=-speed;
+
+  /* ENES_LAB_TANK has 4 motors, two per side */
+  /* Drive them simultaneously */
+  if(motor==DCM_MOTOR1) {
+    TankClient_setMotorPWM(1, speed);
+    TankClient_setMotorPWM(2, speed);
+    }
+  if(motor==DCM_MOTOR1) {
+    TankClient_setMotorPWM(3, speed);
+    TankClient_setMotorPWM(4, speed);
+    }
+}
+#endif
 
 double current_x, current_y, current_angle;
 
@@ -440,6 +586,8 @@ void setup()
   Serial.println(WiFi.localIP());
   #endif 
   
+
+  #ifdef HARDWARE_OTV
   
   pinMode (DCM_IN1, OUTPUT);
   pinMode (DCM_IN2, OUTPUT);
@@ -453,10 +601,40 @@ void setup()
   pinMode (ULTRA2_ECHO , INPUT);
   pinMode (ULTRA3_TRIG, OUTPUT);
   pinMode (ULTRA3_ECHO , INPUT);
+  #endif
+
+  #ifdef HARDWARE_ENES_LAB_TANK
+    // Motors
+    pinMode(PIN_MOTOR_1_FORWARD, OUTPUT);
+    pinMode(PIN_MOTOR_1_REVERSE, OUTPUT);
+    pinMode(PIN_MOTOR_2_FORWARD, OUTPUT);
+    pinMode(PIN_MOTOR_2_REVERSE, OUTPUT);
+    pinMode(PIN_MOTOR_3_FORWARD, OUTPUT);
+    pinMode(PIN_MOTOR_3_REVERSE, OUTPUT);
+    pinMode(PIN_MOTOR_4_FORWARD, OUTPUT);
+    pinMode(PIN_MOTOR_4_REVERSE, OUTPUT);
+
+    // Bump Sensors
+    pinMode(PIN_BUMP_FRONT, INPUT);
+    pinMode(PIN_BUMP_REAR, INPUT);
+    
+    // Ultrasonic Sensors
+    pinMode(PIN_US_FRONT_TRIG, OUTPUT);
+    pinMode(PIN_US_FRONT_ECHO, INPUT);
+    pinMode(PIN_US_REAR_TRIG, OUTPUT);
+    pinMode(PIN_US_REAR_ECHO, INPUT);
+
+    // Infrared Sensors
+    pinMode(PIN_IR_1, INPUT);
+    pinMode(PIN_IR_2, INPUT);
+    pinMode(PIN_IR_3, INPUT);
+    pinMode(PIN_IR_4, INPUT);
+  #endif
 
   // AMG8833 IR Array code
 
   AMG_frame_timestamp=millis();
+  #ifdef HARDWARE_AMG8833_PRESENT
   Serial.println(F("AMG8833 pixels"));
 
   bool status;
@@ -473,6 +651,8 @@ void setup()
   Serial.println();
 
   delay(100); // let sensor boot up
+
+  #endif
 
   // Change 0 to 1 to make motors constantly spin forward for FORWARD LOCOMOTION to begin subtask 2
   /* 0 comments out the code essentially */ 
@@ -519,7 +699,7 @@ void setup()
   // Enes100.begin(const char* teamName, byte teamType, int markerId, int roomNumber, int wifiModuleTX, int wifiModuleRX);
   // TX and RX are lines on the ESP8266 used for communicating, TX is to transmit and RX is to receive
   // Mega has only certain pins for communicating over WiFi (stated on the Enes100 library), needs to be tested 
-  #ifdef HARDWARE_OTV 
+  #ifdef HARDWARE_ARUCO_PRESENT
   Enes100.begin("Fabulous Firefighters", FIRE, ESP8266_MARKER, ESP8266_ROOM, ESP8266_TX, ESP8266_RX);
   Enes100.println("Setup done"); 
   
@@ -656,4 +836,4 @@ void loop()
     state=STATE_DONE;
     Enes100.println("All done!"); 
   }
-}
+} 
