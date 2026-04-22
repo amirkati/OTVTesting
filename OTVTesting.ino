@@ -114,6 +114,18 @@ float pixels[AMG88xx_PIXEL_ARRAY_SIZE];
 #define PIN_MOTOR_3_REVERSE 5
 #define PIN_MOTOR_4_FORWARD 2
 #define PIN_MOTOR_4_REVERSE 3
+
+/*
+ * #define PIN_MOTOR_1_FORWARD 11
+#define PIN_MOTOR_1_REVERSE 10
+#define PIN_MOTOR_2_FORWARD 9
+#define PIN_MOTOR_2_REVERSE 8
+#define PIN_MOTOR_3_FORWARD 4
+#define PIN_MOTOR_3_REVERSE 5
+#define PIN_MOTOR_4_FORWARD 2
+#define PIN_MOTOR_4_REVERSE 3
+ */
+
 // Bump Sensors
 #define PIN_BUMP_FRONT 32
 #define PIN_BUMP_REAR 33
@@ -144,13 +156,13 @@ float pixels[AMG88xx_PIXEL_ARRAY_SIZE];
 /* This factor needs to be adjusted so that it gives number of minutes for motors to run in opposite to rotate 60 degrees (or number of seconds to rotate 1 degree, but that is hard to measure)
    reduce value to prevent overshoot in rotate_absolute() 
    */
-#define DCM_ANGLE_TO_TIME_FACTOR          0.5
+#define DCM_ANGLE_TO_TIME_FACTOR          115 // 0.5 Does a 90* degree
 
 // Tank pin assignments
 #define ESP8266_TX        PIN_WIFI_TX
 #define ESP8266_RX        PIN_WIFI_RX
 // Ask TA and change ESP8266_MARKER
-#define ESP8266_MARKER    397
+#define ESP8266_MARKER    15
 #define ESP8266_ROOM      1116
 
 /* ENES_LAB_TANK has no servos, define for compatibility */
@@ -276,7 +288,7 @@ void set_dc_motor(int motor, int dir, int speed)
 {
   if(dir==DCM_DIR_OFF)speed=0;
   else
-  if(dir=DCM_DIR_BACKWARD)speed=-speed;
+  if(dir==DCM_DIR_BACKWARD)speed=-speed;
 
   /* ENES_LAB_TANK has 4 motors, two per side */
   /* Drive them simultaneously */
@@ -284,7 +296,7 @@ void set_dc_motor(int motor, int dir, int speed)
     TankClient_setMotorPWM(1, speed);
     TankClient_setMotorPWM(2, speed);
     }
-  if(motor==DCM_MOTOR1) {
+  if(motor==DCM_MOTOR2) {
     TankClient_setMotorPWM(3, speed);
     TankClient_setMotorPWM(4, speed);
     }
@@ -415,6 +427,7 @@ void rotate_absolute(double angle)
 {
   double tolerance=5; // Tolerance in degrees 
   // If it keeps spinning then the rotate needs a sign change because the motors were swapped
+  // It does need a sign change
   // If it instead keeps moving back and forth, increase tolerance instead
   // Assuming angle 0 is NORTH towards increasing y 
   while(1)
@@ -656,7 +669,7 @@ void setup()
 
   // Change 0 to 1 to make motors constantly spin forward for FORWARD LOCOMOTION to begin subtask 2
   /* 0 comments out the code essentially */ 
-  #if 1
+  #if 0
   set_dc_motor(DCM_MOTOR1, DCM_DIR_FORWARD, DCM_MOTOR_SPEED_A);
   set_dc_motor(DCM_MOTOR2, DCM_DIR_FORWARD, DCM_MOTOR_SPEED_B);
   while(1); /* endless loop */
@@ -666,6 +679,7 @@ void setup()
   // Does a 90 degree turn and waits for 5 seconds. OTV performs this 3 times.
   // Depends on calibration factors to be correct. 
   // If Wifi works, then the code below this should work better
+  // Delay of 5000 makes it super slow
   #if 0
   /* 90 degree turns using rotate_relative(), without Aruco */
    // Rotate left first
@@ -683,15 +697,15 @@ void setup()
   // Change 0 to 1 to begin subtask 10 if servo pins are connected (and written correctly) 
   // This elevates the blanket up and waits for 5 seconds, and then puts blanket down and waits for 5 seconds. It repeats. 
   // SERIAL_8N1 is a parity setting that describes the format of transmitted data. (The parity bit is 8 total data bits, no parity bit and one stop bit.)
-  #if 0
+  #if 1
   SERVO_SERIAL.begin(1000000, SERIAL_8N1);
   st.pSerial=&SERVO_SERIAL;
 
   while(1) {
     blanket_up();
-    delay(5000);
+    delay(1000);
     blanket_down();
-    delay(5000);
+    delay(1000);
   }
   #endif
 
@@ -737,16 +751,17 @@ void setup()
 
   // Change to 1 to begin subtask 3.
   // Does a 90 degree turn and waits for 5 seconds. OTV performs this 3 times.
+  // Changed signs
   #if 0
   /* 90 degree rotation test */
   rotate_absolute(0);
-  delay(5000);
+  delay(1000);
   rotate_absolute(90);
-  delay(5000);
+  delay(1000);
   rotate_absolute(180);
-  delay(5000);
+  delay(1000);
   rotate_absolute(270);
-  delay(5000);
+  delay(1000);
   rotate_absolute(0);
   while(1); /* endless loop */
   
