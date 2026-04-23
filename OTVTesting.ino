@@ -18,8 +18,8 @@ float pixels[AMG88xx_PIXEL_ARRAY_SIZE];
 
 // Choose one: testboard or otv or ENES_LAB_TANK
 // #define HARDWARE_TESTBOARD
-// #define HARDWARE_OTV
-#define HARDWARE_ENES_LAB_TANK
+#define HARDWARE_OTV
+// #define HARDWARE_ENES_LAB_TANK
 
 /* Defines for specific hardware modules */
 
@@ -39,7 +39,7 @@ float pixels[AMG88xx_PIXEL_ARRAY_SIZE];
 // If the thermal camera angle keeps spinning then SWAP pairs (IN1, IN2) with (IN3, IN4) to swap left and right motor
 #define DCM_IN1 7
 #define DCM_IN2 6 
-#define DCM_IN3 5 
+#define DCM_IN3 5 // Switch IN3 with IN4 ?
 #define DCM_IN4 4 
 #define DCM_ENA 12 
 #define DCM_ENB 13  
@@ -90,6 +90,7 @@ float pixels[AMG88xx_PIXEL_ARRAY_SIZE];
 
 // servo number is marked on servo
 #define BLANKET_SERVO       4
+#define BLANKET_SERVO_SPEED 200 // too slow? do 1500
 
 // angle that makes blanket go down - adjust based on test
 #define BLANKET_DOWN_POSITION  2048
@@ -371,6 +372,19 @@ double read_ultrasonic_sensor(int sensor)
   return(duration*0.000343*0.5);
 }
 
+// All three sensors are mounted in front
+// Return the closest distance to obstacle any of them report
+double obstacle_distance3()
+{
+double dist=1e20;
+for(int i=0;i<3;i++) {
+  double a=read_ultrasonic_sensor(i);
+  if(a<0)continue;
+  if(a<=dist)dist=a;
+  }
+ return(dist);
+}
+
 // To be coded later
 void extend_arm(int extend)
 {
@@ -446,12 +460,12 @@ SMS_STS st;
 
 void blanket_down(void)
 {
-  st.WritePosEx(BLANKET_SERVO, BLANKET_DOWN_POSITION, 3400, 50);
+  st.WritePosEx(BLANKET_SERVO, BLANKET_DOWN_POSITION, BLANKET_SERVO_SPEED, 50);
 }
 
 void blanket_up(void)
 {
-  st.WritePosEx(BLANKET_SERVO, BLANKET_UP_POSITION, 3400, 50);
+  st.WritePosEx(BLANKET_SERVO, BLANKET_UP_POSITION, BLANKET_SERVO_SPEED, 50);
 }
 
 // To be coded later
@@ -470,8 +484,7 @@ double angle_to_flame()
 
 double forward_obstacle_distance()
 {
-  TODO("Determine forward_obstacle distance from ultrasound or another sensor")
-  return(0);
+  return(obstacle_distance3());
 }
 
 // This function will give the estimated distance to flame (in meters). 
@@ -510,6 +523,32 @@ void mark_map(double x, double y, int mark)
   if((x0>=0) && (y0>=0) && (x0<NX) && (y0<NY))topo_map[x0][y0]=mark;
 }
 
+void avoid_obstacle_right()
+{
+  move(-0.3); /* move robot length away */
+  while(1) {
+    rotate_relative(-90);
+    if(forward_obstacle_distance()>0.4)break; // change 0.4 if the OTV is too long
+    /* there is another obstacle on the right, back off some more */
+    rotate_relative(90);
+    move(-0.3);
+    }
+  move(0.3);
+}
+
+void avoid_obstacle_left()
+{
+  move(-0.3); /* move robot length away */
+  while(1) {
+    rotate_relative(90);
+    if(forward_obstacle_distance()>0.4)break; // change 0.4 if the OTV is too long
+    /* there is another obstacle on the left, back off some more */
+    rotate_relative(-90);
+    move(-0.3);
+    }
+  move(0.3);
+}
+
 void traverse_to(double dest_x, double dest_y)
 {
   double dx, dy, angle;
@@ -525,13 +564,38 @@ void traverse_to(double dest_x, double dest_y)
     angle=atan2(dy, dx)*180/3.1415;
     rotate_absolute(angle);
     move(0.05);
+
+    if(forward_obstacle_distance()<0.1) {
+      /* we are about to hit something, back off and go around */
+      avoid_obstacle_right(); // change to left if necessary?
+      }
     }
   rotate_absolute(0);
 }
 
+// This checks if the OTV is on the left or right of the arena.
 void traverse_to_y(double dest_y)
 {
+  double dx, dy, angle;
+  double tolerance=0.1;
+
   TODO("Use aruco x,y and angle as well as map to drive to dest_y and some dest_x as happens. Update map as obstacles are found")
+  
+  while(1) {
+    dy=dest_y-aruco_y();
+    if(fabs(dy)<tolerance)break;
+    rotate_absolute(90);
+    move(0.05);
+
+    if(forward_obstacle_distance()<0.1) {
+      /* we are about to hit something, back off and go around */
+      if(aruco_x()<1.5)
+        avoid_obstacle_right();
+        else 
+        avoid_obstacle_left();
+      }
+    }
+  rotate_absolute(0);
 }
 
 void main_program(void)
@@ -567,8 +631,14 @@ void main_program(void)
 #endif
 
 // In meters
+// 0.8 meters from arena's start location
+// ZONE_OBSTACLE_START is the beginning of the zone with obstacles. 
 #define ZONE_OBSTACLE_START 0.8
+// 2.8 meters from arena's start location 
+// ZONE_OPEN_START is the end of the zone with obstacles.
 #define ZONE_OPEN_START     2.8
+// 3.4 meters from arena's start location (Y=0 from Aruco?)
+// ZONE_GOAL_START is the beginning of the goal zone. 
 #define ZONE_GOAL_START     3.4
 
 // long is an integer variable that can hold large numbers that are 32 bits
@@ -694,10 +764,24 @@ void setup()
 
   #endif
 
+// Change 0 to 1 to test obstacle avoidance with ultrasonic sensor
+  #if 0
+
+  while(1) {
+      if(forward_obstacle_distance()<0.1) {
+        // Uncomment one of the functions to test
+        avoid_obstacle_left();
+        //avoid_obstacle_right();
+        }
+      delay(100);
+      }
+
+  #endif
+
   // Change 0 to 1 to begin subtask 10 if servo pins are connected (and written correctly) 
   // This elevates the blanket up and waits for 5 seconds, and then puts blanket down and waits for 5 seconds. It repeats. 
   // SERIAL_8N1 is a parity setting that describes the format of transmitted data. (The parity bit is 8 total data bits, no parity bit and one stop bit.)
-  #if 1
+  #if 0
   SERVO_SERIAL.begin(1000000, SERIAL_8N1);
   st.pSerial=&SERVO_SERIAL;
 
@@ -828,18 +912,13 @@ void loop()
   }
   
   if(state==STATE_FOUND_CANDLES) 
-  {
-    // Add any code necessary to start obstacle avoidance 
-    // For example, moving OTV to the middle of the field
-    // move(0.5);
+  { 
     state=STATE_DRIVING_OBSTACLES; 
   }
 
   if(state==STATE_DRIVING_OBSTACLES) 
   {
-    rotate_absolute(0);
-    TODO("Add obstacle avoidance code when ultrasonic sensors are sorted out (pin locations and distance response)")  
-    move(0.1); // An example
+    traverse_to_y(ZONE_GOAL_START+0.3);
     if(aruco_y()>ZONE_GOAL_START) 
     {
       state=STATE_REACHED_GOAL; 
