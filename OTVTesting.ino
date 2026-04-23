@@ -553,7 +553,6 @@ void traverse_to(double dest_x, double dest_y)
 {
   double dx, dy, angle;
   double tolerance=0.1;
-  rotate_absolute(0);
 
   TODO("Use aruco x,y and angle as well as map to drive to dest_x and dest_y. Update map as obstacles are found")
 
@@ -570,9 +569,28 @@ void traverse_to(double dest_x, double dest_y)
       avoid_obstacle_right(); // change to left if necessary?
       }
     }
-  rotate_absolute(0);
 }
 
+void traverse_to_obstacle(double dest_x, double dest_y)
+{
+  double dx, dy, angle;
+  double tolerance=0.1;
+
+  TODO("Use aruco x,y and angle as well as map to drive to dest_x and dest_y. Update map as obstacles are found")
+
+  while(1) {
+    dx=dest_x-aruco_x();
+    dy=dest_y-aruco_y();
+    if(fabs(dx)<tolerance && fabs(dy)<tolerance)break;
+    angle=atan2(dy, dx)*180/3.1415;
+    rotate_absolute(angle);
+    move(0.05);
+
+    if(forward_obstacle_distance()<0.1) {
+      break; /* stop if obstacle is found like candles */
+      }
+    }
+}
 // This checks if the OTV is on the left or right of the arena.
 void traverse_to_y(double dest_y)
 {
@@ -589,13 +607,12 @@ void traverse_to_y(double dest_y)
 
     if(forward_obstacle_distance()<0.1) {
       /* we are about to hit something, back off and go around */
-      if(aruco_x()<1.5)
+      if(aruco_x()<1.0)
         avoid_obstacle_right();
         else 
         avoid_obstacle_left();
       }
     }
-  rotate_absolute(0);
 }
 
 void main_program(void)
@@ -885,6 +902,7 @@ void loop()
 {
   if(state==STATE_START) 
   {
+    #ifdef HARDWARE_AMG8833_PRESENT
     // For the AMG8833 camera 
     //read all the pixels
     if(AMG_frame_timestamp+AMG_frame_interval<millis())
@@ -901,10 +919,19 @@ void loop()
       }
     Serial.println("]");
     Serial.println();
+    #endif
     
-    rotate_absolute(0); 
-    move(0.05); // An example 
-    rotate_absolute(90); // It points towards the candles 
+    rotate_absolute(90); 
+
+    // It checks the x coordinate to see if the OTV is in A or B.
+    if(aruco_x()>1.0) {
+        traverse_to_obstacle(0.5, 0.4);
+        rotate_absolute(180);
+        } else {
+        traverse_to_obstacle(1.5, 0.4);
+        rotate_absolute(0);          
+        }
+    delay(1000); /* 1 sec */
     TODO("add candle seeking after IR array is sorted out")
     state=STATE_FOUND_CANDLES; 
     Enes100.mission(NUM_CANDLES, 5); // Found 5 candles 
@@ -913,6 +940,11 @@ void loop()
   
   if(state==STATE_FOUND_CANDLES) 
   { 
+    /* activate blanket */
+    blanket_down();
+    delay(3000); /* hopefully 3 long seconds is enough to extinguish */
+    blanket_up();
+    
     state=STATE_DRIVING_OBSTACLES; 
   }
 
