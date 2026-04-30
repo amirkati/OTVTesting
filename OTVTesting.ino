@@ -375,7 +375,7 @@ NewPing sonar[3]= {
 };
 
 // Returns distance in meters
-// Use with sonar[sensor].ping_cm()
+// It returns value with sonar[sensor].ping_cm()
 // Works automatically
 double read_ultrasonic_sensor(int sensor)
 {
@@ -415,6 +415,8 @@ for(int i=0;i<3;i++) {
   if(a<0)continue;
   if(a<=dist)dist=a;
   }
+ // Likely needs it to make sure that excess signals from far objects are gone
+ delay(50); // 0.05s 
  return(dist);
 }
 
@@ -490,6 +492,42 @@ void rotate_absolute(double angle)
 // code for deploying blanket
 
 SMS_STS st;
+
+
+void blanket_report_servo_status(void)
+{
+  int Pos;
+  int Speed;
+  int Load;
+  int Voltage;
+  int Temper;
+  int Move;
+  int Current;
+    Pos = st.ReadPos(BLANKET_SERVO);
+    Speed = st.ReadSpeed(BLANKET_SERVO);
+    Load = st.ReadLoad(BLANKET_SERVO);
+    Voltage = st.ReadVoltage(BLANKET_SERVO);
+    Temper = st.ReadTemper(BLANKET_SERVO);
+    Move = st.ReadMove(BLANKET_SERVO);
+    Current = st.ReadCurrent(BLANKET_SERVO);
+    Serial.println("Blanket servo feedback:\n");
+    Serial.print("Position:");
+    Serial.println(Pos);
+    Serial.print("Speed:");
+    Serial.println(Speed);
+    Serial.print("Load:");
+    Serial.println(Load);
+    Serial.print("Voltage:");
+    Serial.println(Voltage);
+    Serial.print("Temper:");
+    Serial.println(Temper);
+    Serial.print("Move:");
+    Serial.println(Move);
+    Serial.print("Current:");
+    Serial.println(Current);
+    delay(10);
+
+}
 
 void blanket_down(void)
 {
@@ -837,9 +875,11 @@ void setup()
 
   while(1) {
     blanket_up();
-    delay(1000);
+    delay(5000);
+     blanket_report_servo_status();
     blanket_down();
-    delay(1000);
+    delay(5000);
+     blanket_report_servo_status();
   }
   #endif
 
@@ -932,7 +972,9 @@ int state=STATE_START;
 // IF this compiles well with Mega and ESP8266 WiFi module, this code will tell the OTV to drive to the other end of the field (as wanted in the MS5 document)
 // This won't start as long as the void setup() is running.
 void loop() 
-{
+{ 
+  Serial.print("state="); Serial.println(state);
+
   if(state==STATE_START) 
   {
     #ifdef HARDWARE_AMG8833_PRESENT
@@ -973,10 +1015,15 @@ void loop()
   
   if(state==STATE_FOUND_CANDLES) 
   { 
-    /* activate blanket */
-    // blanket_down();
-    delay(3000); /* hopefully 3 long seconds is enough to extinguish */
-    // blanket_up();
+    // Change to 1 to activate blanket
+    #if 0
+     blanket_down();
+    delay(5000); /* hopefully 5 long seconds is enough to extinguish */
+     blanket_report_servo_status();
+     blanket_up();
+     delay(5000); /* Delay so that the OTV does not move immediately */
+     blanket_report_servo_status();
+    #endif
     
     state=STATE_DRIVING_OBSTACLES; 
   }
