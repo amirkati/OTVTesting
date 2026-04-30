@@ -412,6 +412,16 @@ double obstacle_distance3()
 double dist=1e20;
 for(int i=0;i<3;i++) {
   double a=read_ultrasonic_sensor(i);
+
+  // Prints ultrasonic sensor readings (on the Serial Monitor) 
+  #if 1
+  Serial.print("Ultrasonic sensor ");
+  Serial.print(i);
+  Serial.print(" :");
+  Serial.print(a);
+  Serial.println(" meters.");
+  #endif
+  
   if(a<0)continue;
   if(a<=dist)dist=a;
   }
