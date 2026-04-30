@@ -10,6 +10,12 @@
 #include <Wire.h>
 #include <Adafruit_AMG88xx.h>
 
+#define USE_NEW_PING
+
+#ifdef USE_NEW_PING
+#include <NewPing.h>
+#endif
+
 // This sensor uses I2C to communicate. The device's I2C address is 0x69
 
 Adafruit_AMG88xx amg;
@@ -41,8 +47,8 @@ float pixels[AMG88xx_PIXEL_ARRAY_SIZE];
 #define DCM_IN2 6 
 #define DCM_IN3 5 // Switch IN3 with IN4 ?
 #define DCM_IN4 4 
-#define DCM_ENA 12 
-#define DCM_ENB 13  
+#define DCM_ENA 8 
+#define DCM_ENB 9  
 
 /* This factor needs to be adjusted so that it gives number of seconds for motors to run to travel 1 meter */
 #define DCM_DISTANCE_TO_TIME_FACTOR       1.5
@@ -58,10 +64,10 @@ float pixels[AMG88xx_PIXEL_ARRAY_SIZE];
 // Students have had difficulty with the Mega. Some students have a certain set of pins work while other students will find those same pins broken.
 
 // Change these based on where the ESP8266 is actually connected. Check that it is an allowed pin for Mega.
-#define ESP8266_TX        14 // 10 
-#define ESP8266_RX        15 // 11
+#define ESP8266_TX        10 //14 10 
+#define ESP8266_RX        11 // 13m 11
 // Ask TA and change ESP8266_MARKER
-#define ESP8266_MARKER    397
+#define ESP8266_MARKER    231 // 397
 #define ESP8266_ROOM      1116
 
 // change this if ARUCO 0 angle does not align with Y direction that points from landing zone to finish.
@@ -357,6 +363,31 @@ int ultra_echo[3]={ULTRA1_ECHO, ULTRA2_ECHO, ULTRA3_ECHO};
 #define ULTRA_SENSOR2     1
 #define ULTRA_SENSOR3     2
 
+#ifdef USE_NEW_PING
+
+/* Max distance to ping in cm */
+#define MAX_DISTANCE 200
+
+NewPing sonar[3]= {
+  NewPing(ULTRA1_TRIG, ULTRA1_ECHO, MAX_DISTANCE), 
+  NewPing(ULTRA2_TRIG, ULTRA2_ECHO, MAX_DISTANCE), 
+  NewPing(ULTRA3_TRIG, ULTRA3_ECHO, MAX_DISTANCE)
+};
+
+// Returns distance in meters
+// Use with sonar[sensor].ping_cm()
+// Works automatically
+double read_ultrasonic_sensor(int sensor)
+{
+  if(sensor<0)return(-1);
+  if(sensor>2)return(-1);
+
+  return(sonar[sensor].ping_cm()*0.01);
+}
+
+#else
+
+
 // Returns distance in meters
 double read_ultrasonic_sensor(int sensor)
 {
@@ -371,9 +402,11 @@ double read_ultrasonic_sensor(int sensor)
   double duration=pulseIn(ultra_echo[sensor], HIGH);
   return(duration*0.000343*0.5);
 }
+#endif
 
 // All three sensors are mounted in front
 // Return the closest distance to obstacle any of them report
+// Uses the read_ultrasonic_sensor function
 double obstacle_distance3()
 {
 double dist=1e20;
@@ -941,9 +974,9 @@ void loop()
   if(state==STATE_FOUND_CANDLES) 
   { 
     /* activate blanket */
-    blanket_down();
+    // blanket_down();
     delay(3000); /* hopefully 3 long seconds is enough to extinguish */
-    blanket_up();
+    // blanket_up();
     
     state=STATE_DRIVING_OBSTACLES; 
   }
