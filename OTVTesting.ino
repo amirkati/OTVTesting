@@ -169,7 +169,7 @@ float pixels[AMG88xx_PIXEL_ARRAY_SIZE];
 #define ESP8266_TX        PIN_WIFI_TX
 #define ESP8266_RX        PIN_WIFI_RX
 // Ask TA and change ESP8266_MARKER
-#define ESP8266_MARKER    15
+#define ESP8266_MARKER    19
 #define ESP8266_ROOM      1116
 
 /* ENES_LAB_TANK has no servos, define for compatibility */
@@ -179,6 +179,7 @@ float pixels[AMG88xx_PIXEL_ARRAY_SIZE];
 
 // servo number is marked on servo
 #define BLANKET_SERVO       4
+#define BLANKET_SERVO_SPEED 200 // too slow? do 1500
 
 // angle that makes blanket go down - adjust based on test
 #define BLANKET_DOWN_POSITION  2048
@@ -513,6 +514,10 @@ void blanket_report_servo_status(void)
   int Temper;
   int Move;
   int Current;
+  int Mode;
+  
+    st.FeedBack(BLANKET_SERVO); // This actually transfers data from servo
+  
     Pos = st.ReadPos(BLANKET_SERVO);
     Speed = st.ReadSpeed(BLANKET_SERVO);
     Load = st.ReadLoad(BLANKET_SERVO);
@@ -520,7 +525,10 @@ void blanket_report_servo_status(void)
     Temper = st.ReadTemper(BLANKET_SERVO);
     Move = st.ReadMove(BLANKET_SERVO);
     Current = st.ReadCurrent(BLANKET_SERVO);
+    Mode = st.ReadMode(BLANKET_SERVO);
     Serial.println("Blanket servo feedback:\n");
+    Serial.print("Mode:");
+    Serial.println(Mode);
     Serial.print("Position:");
     Serial.println(Pos);
     Serial.print("Speed:");
@@ -751,6 +759,30 @@ void setup()
   // 115200 is the transmission speed, adjust SerialMonitor's speed to the same value
   Serial.println();
 
+  Serial.println("Starting OTV firmware");
+
+  Serial.print("Features enabled:");
+
+  #ifdef OTV_HARDWARE
+  Serial.print(" OTV_HARDWARE");
+  #endif
+
+  #ifdef HARDWARE_ARUCO_PRESENT
+  Serial.print(" HARDWARE_ARUCO_PRESENT");
+  #endif
+
+  #ifdef HARDWARE_AMG8833_PRESENT
+  Serial.print(" HARDWARE_AMG8833_PRESENT");
+  #endif
+
+  #ifdef USE_NEW_PING
+  Serial.print(" USE_NEW_PING");
+  #endif
+
+  #ifdef HARDWARE_ENES_LAB_TANK
+  Serial.print(" HARDWARE_ENES_LAB_TANK");
+  #endif
+
   // An example of connecting to a WiFi network
   #if 0 
   WiFi.begin("network-name", "pass-to-network");
@@ -863,7 +895,7 @@ void setup()
   #endif
 
 // Change 0 to 1 to test obstacle avoidance with ultrasonic sensor
-  #if 0
+  #if 1
 
   while(1) {
       if(forward_obstacle_distance()<0.1) {
@@ -876,12 +908,18 @@ void setup()
 
   #endif
 
+// This is needed to initilize servo
+  SERVO_SERIAL.begin(1000000, SERIAL_8N1); // try 115200 // could be the problem 
+  st.pSerial=&SERVO_SERIAL;
+
+  st.writeByte(BLANKET_SERVO, SMS_STS_MODE, 0); // Switch servo to Position mode 
+
   // Change 0 to 1 to begin subtask 10 if servo pins are connected (and written correctly) 
   // This elevates the blanket up and waits for 5 seconds, and then puts blanket down and waits for 5 seconds. It repeats. 
   // SERIAL_8N1 is a parity setting that describes the format of transmitted data. (The parity bit is 8 total data bits, no parity bit and one stop bit.)
   #if 0
-  SERVO_SERIAL.begin(1000000, SERIAL_8N1);
-  st.pSerial=&SERVO_SERIAL;
+//  SERVO_SERIAL.begin(1000000, SERIAL_8N1); // try 115200
+//  st.pSerial=&SERVO_SERIAL;
 
   while(1) {
     blanket_up();
@@ -984,6 +1022,7 @@ int state=STATE_START;
 void loop() 
 { 
   Serial.print("state="); Serial.println(state);
+  // 115200 baud seems to work ? 
 
   if(state==STATE_START) 
   {
@@ -1005,6 +1044,9 @@ void loop()
     Serial.println("]");
     Serial.println();
     #endif
+
+    blanket_report_servo_status(); // comment out later
+    // Add Serial 
     
     rotate_absolute(90); 
 
@@ -1028,7 +1070,7 @@ void loop()
     // Change to 1 to activate blanket
     #if 0
      blanket_down();
-    delay(5000); /* hopefully 5 long seconds is enough to extinguish */
+     delay(5000); /* hopefully 5 long seconds is enough to extinguish */
      blanket_report_servo_status();
      blanket_up();
      delay(5000); /* Delay so that the OTV does not move immediately */
