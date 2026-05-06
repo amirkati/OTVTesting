@@ -68,7 +68,7 @@ float pixels[AMG88xx_PIXEL_ARRAY_SIZE];
 #define ESP8266_RX        11 // 13m 11
 // Ask TA and change ESP8266_MARKER
 #define ESP8266_MARKER    231 // 397
-#define ESP8266_ROOM      1116
+#define ESP8266_ROOM      1201 // 1116 // 1215
 
 // change this if ARUCO 0 angle does not align with Y direction that points from landing zone to finish.
 #define ARUCO_Y_ANGLE     0
@@ -432,6 +432,15 @@ for(int i=0;i<3;i++) {
   Serial.print(a);
   Serial.println(" meters.");
   #endif
+
+/* Workaround for mulfunctioning sensors */
+  if(a<=0.001) {
+    Serial.print("Sensor ");
+    Serial.print(i);
+    Serial.print(" abnormal reading a=");
+    Serial.println(a);
+    continue; 
+  }
   
   if(a<0)continue;
   if(a<=dist)dist=a;
