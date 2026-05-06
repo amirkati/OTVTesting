@@ -75,12 +75,22 @@ float pixels[AMG88xx_PIXEL_ARRAY_SIZE];
 
 // Ultrasonic sensors:
 
-#define ULTRA1_TRIG     32
+/*#define ULTRA1_TRIG     32
 #define ULTRA1_ECHO     33
 #define ULTRA2_TRIG     50
 #define ULTRA2_ECHO     51
 #define ULTRA3_TRIG     52
 #define ULTRA3_ECHO     53
+*/
+
+#define ULTRA1_TRIG     53 // 32
+#define ULTRA1_ECHO     52 // 33
+#define ULTRA2_TRIG     51 // 50
+#define ULTRA2_ECHO     50 // 51
+#define ULTRA3_TRIG     31 // 52
+#define ULTRA3_ECHO     30 // 53
+
+// Red is VCC, blue is TRIG, green is ECHO, black is GND
 
 // Servo motor UART pins for Mega: Serial1 is (RX=19 TX=18) Serial2 is (RX=17, TX=16) and so on.
 // The SERVO_SERIAL HAS to match pins
